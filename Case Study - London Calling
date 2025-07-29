@@ -1,0 +1,83 @@
+# Let's import the pandas, numpy libraries as pd, and np respectively. 
+import pandas as pd
+import numpy as np
+
+# Load the pyplot collection of functions from matplotlib, as plt 
+import matplotlib.pyplot as plt
+
+# First, make a variable called url_LondonHousePrices, and assign it the following link, enclosed in quotation-marks as a string:
+# https://data.london.gov.uk/download/uk-house-price-index/70ac0766-8902-4eb5-aab5-01951aaed773/UK%20House%20price%20index.xls
+
+url_LondonHousePrices = "https://data.london.gov.uk/download/uk-house-price-index/70ac0766-8902-4eb5-aab5-01951aaed773/UK%20House%20price%20index.xls"
+
+# The dataset we're interested in contains the Average prices of the houses, and is actually on a particular sheet of the Excel file. 
+# As a result, we need to specify the sheet name in the read_excel() method.
+# Put this data into a variable called properties.  
+properties = pd.read_excel(url_LondonHousePrices, sheet_name='Average price', index_col= None)
+
+properties = properties.transpose()
+properties.head()
+
+properties = properties.reset_index()
+properties.columns = properties.iloc[0]
+properties = properties.drop(0)
+properties.head()
+
+properties = properties.rename(columns = {'Unnamed: 0':'London_Borough', pd.NaT: 'ID'})
+properties.head()
+
+clean_properties = pd.melt(properties, id_vars= ['London_Borough', 'ID'])
+clean_properties = clean_properties.rename(columns = {0: 'Month', 'value': 'Average_price'})
+clean_properties.head()
+
+clean_properties['Average_price'] = pd.to_numeric(clean_properties['Average_price'])
+clean_properties.head()
+
+NaNFreeDF2 = clean_properties.dropna()
+nonBoroughs = ['Inner London', 'Outer London', 
+               'NORTH EAST', 'NORTH WEST', 'YORKS & THE HUMBER', 
+               'EAST MIDLANDS', 'WEST MIDLANDS',
+              'EAST OF ENGLAND', 'LONDON', 'SOUTH EAST', 
+              'SOUTH WEST', 'England']
+NaNFreeDF2[~NaNFreeDF2.London_Borough.isin(nonBoroughs)]
+df = NaNFreeDF2
+df.head()
+
+camden_prices = df[df['London_Borough'] == 'Camden']
+ax = camden_prices.plot(kind = 'line', x = 'Month', y = 'Average_price')
+
+df['Year'] = df['Month'].apply(lambda t: t.year)
+dfg = df.groupby(by=['London_Borough', 'Year']).mean()
+dfg.sample(10)
+
+# Here's where you should write your function:
+def create_price_ratio(d):
+    y1998 = float(d['Average_price'][d['Year']==1998])
+    y2018 = float(d['Average_price'][d['Year']==2018])
+    ratio = [y2018/1998]
+    return ratio
+
+
+create_price_ratio(dfg[dfg['London_Borough']=='Barking & Dagenham'])
+final = {}
+for b in dfg['London_Borough'].unique():
+    # Let's make our parameter to our create_price_ratio function: i.e., we subset dfg on 'London_Borough' == b. 
+    borough = dfg[dfg['London_Borough'] == b]
+    # Make a new entry in the final dictionary whose value's the result of calling create_price_ratio with the argument: borough
+    final[b] = create_price_ratio(borough)
+# We use the function and incorporate that into a new key of the dictionary 
+print(final) 
+
+df_ratios = pd.DataFrame(final)
+df_ratios_T = df.T
+df_ratios = df_ratios_T.reset_index()
+
+df_ratios.rename(columns={'index':'Borough', 0:'2018'}, inplace=True)
+top15 = df_ratios.groupby(by='2018',ascending=False).head(15)
+print(top15)
+
+ax = top15[['Borough','2018']].plot(kind='bar')
+ax.set_xticklabels(top15.Borough)
+
+
+
